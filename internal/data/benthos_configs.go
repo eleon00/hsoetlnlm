@@ -16,8 +16,8 @@ func (db *DB) CreateBenthosConfig(ctx context.Context, config *BenthosConfigurat
 
 	query := `
 		INSERT INTO BenthosConfigurations (Name, Configuration, CreatedAt, UpdatedAt)
-		OUTPUT INSERTED.ID
-		VALUES (@p1, @p2, @p3, @p4);`
+		VALUES ($1, $2, $3, $4)
+		RETURNING ID;`
 
 	now := time.Now()
 	var insertedID int64
@@ -42,7 +42,7 @@ func (db *DB) GetBenthosConfig(ctx context.Context, id int64) (*BenthosConfigura
 		return nil, fmt.Errorf("database connection is not initialized")
 	}
 
-	query := `SELECT ID, Name, Configuration, CreatedAt, UpdatedAt FROM BenthosConfigurations WHERE ID = @p1;`
+	query := `SELECT ID, Name, Configuration, CreatedAt, UpdatedAt FROM BenthosConfigurations WHERE ID = $1;`
 
 	row := db.SQL.QueryRowContext(ctx, query, id)
 	var config BenthosConfiguration
@@ -107,7 +107,7 @@ func (db *DB) UpdateBenthosConfig(ctx context.Context, config *BenthosConfigurat
 		return fmt.Errorf("database connection is not initialized")
 	}
 
-	query := `UPDATE BenthosConfigurations SET Name = @p1, Configuration = @p2, UpdatedAt = @p3 WHERE ID = @p4;`
+	query := `UPDATE BenthosConfigurations SET Name = $1, Configuration = $2, UpdatedAt = $3 WHERE ID = $4;`
 
 	now := time.Now()
 	result, err := db.SQL.ExecContext(ctx, query,
@@ -137,7 +137,7 @@ func (db *DB) DeleteBenthosConfig(ctx context.Context, id int64) error {
 		return fmt.Errorf("database connection is not initialized")
 	}
 
-	query := `DELETE FROM BenthosConfigurations WHERE ID = @p1;`
+	query := `DELETE FROM BenthosConfigurations WHERE ID = $1;`
 
 	result, err := db.SQL.ExecContext(ctx, query, id)
 	if err != nil {

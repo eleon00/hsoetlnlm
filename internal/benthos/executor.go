@@ -9,18 +9,18 @@ import (
 )
 
 // ExecuteBenthosPipeline runs a Benthos pipeline using the provided YAML configuration.
-// It executes the 'benthos' command, passing the config via standard input.
+// It executes the 'rpk connect run' command, passing the config via standard input.
 // It returns the combined stdout/stderr output and any execution error.
 func ExecuteBenthosPipeline(ctx context.Context, configYAML string) (string, error) {
-	// Check if benthos executable exists in PATH
-	benthosPath, err := exec.LookPath("benthos")
+	// Check if rpk executable exists in PATH
+	rpkPath, err := exec.LookPath("rpk")
 	if err != nil {
-		return "", fmt.Errorf("benthos command not found in PATH: %w", err)
+		return "", fmt.Errorf("rpk command not found in PATH: %w", err)
 	}
 
 	// Create the command with context for potential cancellation/timeout
-	// We pass the config via stdin using the '-c -' flags.
-	cmd := exec.CommandContext(ctx, benthosPath, "-c", "-")
+	// We pass the config via stdin using the '-c -' flags with 'rpk connect run'.
+	cmd := exec.CommandContext(ctx, rpkPath, "connect", "run", "-c", "-")
 
 	// Set the standard input to the configuration string
 	cmd.Stdin = bytes.NewBufferString(configYAML)
@@ -40,11 +40,11 @@ func ExecuteBenthosPipeline(ctx context.Context, configYAML string) (string, err
 	if err != nil {
 		// If the command failed, include the output in the error message
 		// as Benthos often prints useful error details to stderr.
-		return outputStr, fmt.Errorf("benthos execution failed after %v: %w\nOutput:\n%s", duration, err, outputStr)
+		return outputStr, fmt.Errorf("rpk connect run execution failed after %v: %w\nOutput:\n%s", duration, err, outputStr)
 	}
 
 	// Optionally, log the successful execution duration and output snippet
-	// log.Printf("Benthos execution successful after %v. Output snippet: %s...", duration, truncateString(outputStr, 100))
+	// logger.Info().Dur("duration", duration).Msg("rpk connect run execution successful")
 
 	return outputStr, nil
 }

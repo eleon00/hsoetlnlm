@@ -16,8 +16,8 @@ func (db *DB) CreateReplicationTask(ctx context.Context, task *ReplicationTask) 
 
 	query := `
 		INSERT INTO ReplicationTasks (Name, SourceConnectionID, TargetConnectionID, Schedule, DataSelectionCriteria, TransformationRules, Status, CreatedAt, UpdatedAt)
-		OUTPUT INSERTED.ID
-		VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9);`
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		RETURNING ID;`
 
 	now := time.Now()
 	var insertedID int64
@@ -54,7 +54,7 @@ func (db *DB) GetReplicationTask(ctx context.Context, id int64) (*ReplicationTas
 	query := `
 		SELECT ID, Name, SourceConnectionID, TargetConnectionID, Schedule, DataSelectionCriteria, TransformationRules, TemporalWorkflowID, Status, CreatedAt, UpdatedAt
 		FROM ReplicationTasks
-		WHERE ID = @p1;`
+		WHERE ID = $1;`
 
 	row := db.SQL.QueryRowContext(ctx, query, id)
 	var task ReplicationTask
@@ -169,10 +169,10 @@ func (db *DB) UpdateReplicationTask(ctx context.Context, task *ReplicationTask) 
 
 	query := `
 		UPDATE ReplicationTasks
-		SET Name = @p1, SourceConnectionID = @p2, TargetConnectionID = @p3,
-		    Schedule = @p4, DataSelectionCriteria = @p5, TransformationRules = @p6,
-		    TemporalWorkflowID = @p7, Status = @p8, UpdatedAt = @p9
-		WHERE ID = @p10;`
+		SET Name = $1, SourceConnectionID = $2, TargetConnectionID = $3,
+		    Schedule = $4, DataSelectionCriteria = $5, TransformationRules = $6,
+		    TemporalWorkflowID = $7, Status = $8, UpdatedAt = $9
+		WHERE ID = $10;`
 
 	now := time.Now()
 	result, err := db.SQL.ExecContext(ctx, query,
@@ -211,7 +211,7 @@ func (db *DB) DeleteReplicationTask(ctx context.Context, id int64) error {
 		return fmt.Errorf("database connection is not initialized")
 	}
 
-	query := `DELETE FROM ReplicationTasks WHERE ID = @p1;`
+	query := `DELETE FROM ReplicationTasks WHERE ID = $1;`
 
 	result, err := db.SQL.ExecContext(ctx, query, id)
 	if err != nil {

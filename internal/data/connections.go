@@ -18,8 +18,8 @@ func (db *DB) CreateConnection(ctx context.Context, conn *Connection) (int64, er
 	// SQL Server syntax for inserting and returning the ID
 	query := `
 		INSERT INTO Connections (Name, Type, ConnectionString, CreatedAt, UpdatedAt)
-		OUTPUT INSERTED.ID
-		VALUES (@p1, @p2, @p3, @p4, @p5);`
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING ID;`
 
 	now := time.Now()
 	var insertedID int64
@@ -47,7 +47,7 @@ func (db *DB) GetConnection(ctx context.Context, id int64) (*Connection, error) 
 	query := `
 		SELECT ID, Name, Type, ConnectionString, CreatedAt, UpdatedAt
 		FROM Connections
-		WHERE ID = @p1;`
+		WHERE ID = $1;`
 
 	row := db.SQL.QueryRowContext(ctx, query, id)
 	var conn Connection
@@ -119,8 +119,8 @@ func (db *DB) UpdateConnection(ctx context.Context, conn *Connection) error {
 
 	query := `
 		UPDATE Connections
-		SET Name = @p1, Type = @p2, ConnectionString = @p3, UpdatedAt = @p4
-		WHERE ID = @p5;`
+		SET Name = $1, Type = $2, ConnectionString = $3, UpdatedAt = $4
+		WHERE ID = $5;`
 
 	now := time.Now()
 	result, err := db.SQL.ExecContext(ctx, query,
@@ -151,7 +151,7 @@ func (db *DB) DeleteConnection(ctx context.Context, id int64) error {
 		return fmt.Errorf("database connection is not initialized")
 	}
 
-	query := `DELETE FROM Connections WHERE ID = @p1;`
+	query := `DELETE FROM Connections WHERE ID = $1;`
 
 	result, err := db.SQL.ExecContext(ctx, query, id)
 	if err != nil {

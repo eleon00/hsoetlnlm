@@ -6,10 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	// Add specific database driver imports here later, e.g.:
-	// _ "github.com/lib/pq"
-	// Import the SQL Server driver, the blank identifier registers the driver
-	_ "github.com/microsoft/go-mssqldb"
+	// Import PostgreSQL driver
+	_ "github.com/lib/pq"
 )
 
 // Repository defines the interface for database operations.
@@ -53,16 +51,13 @@ type DB struct {
 }
 
 // NewDB initializes a new database connection pool.
-// Configuration (like DSN) will be needed here.
 func NewDB(dataSourceName string) (*DB, error) {
 	if dataSourceName == "" {
-		// In a real app, load this from config
 		return nil, fmt.Errorf("database data source name is required")
 	}
 
-	// sql.Open doesn't actually create a connection, just prepares.
-	// Ensure the driver name matches the imported driver.
-	db, err := sql.Open("sqlserver", dataSourceName)
+	// Use "postgres" as the driver name
+	db, err := sql.Open("postgres", dataSourceName)
 	if err != nil {
 		return nil, fmt.Errorf("error opening database: %w", err)
 	}
@@ -73,7 +68,10 @@ func NewDB(dataSourceName string) (*DB, error) {
 		return nil, fmt.Errorf("error connecting to database: %w", err)
 	}
 
-	// TODO: Configure connection pool settings (MaxOpenConns, MaxIdleConns, etc.)
+	// Configure connection pool settings (example)
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(25)
+	db.SetConnMaxLifetime(5 * time.Minute)
 
 	return &DB{SQL: db}, nil
 }

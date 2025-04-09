@@ -183,13 +183,16 @@ func generateOutputConfig(conn data.Connection, task data.ReplicationTask) (map[
 	case "snowflake":
 		account, _ := params["account"]
 		user, _ := params["user"]
-		password, _ := params["password"] // WARNING: Password in connection string is insecure!
+		password, passwordExists := params["password"] // Check if password exists
 		database, _ := params["database"]
 		schema, _ := params["schema"]
 		table, ok := params["table"] // Expect target table in connection string for now
 		if !ok {
 			return nil, fmt.Errorf("'table' not found in connection string for Snowflake output")
 		}
+		// Key pair auth parameters
+		privateKeyPath, pkPathExists := params["private_key_path"]
+		privateKeyPassphrase, pkPassExists := params["private_key_passphrase"]
 
 		snowflakeOutput := map[string]interface{}{ // Use snowflake_put output
 			"account":          account,
@@ -199,12 +202,24 @@ func generateOutputConfig(conn data.Connection, task data.ReplicationTask) (map[
 			"table":            table,
 			"stage_name":       "BENTHOS_STAGE", // Default stage name
 			"file_name_format": `${!count("files")}-${!timestamp_unix_nano()}.json.gz`,
+			// TODO: Add role, warehouse if needed based on params
+			// role, _ := params["role"]
+			// if role != "" { snowflakeOutput["role"] = role }
 		}
-		// Use password only if provided - prefer key pair auth or other methods
-		if password != "" {
+
+		// Prioritize Key Pair Auth over Password Auth
+		if pkPathExists {
+			snowflakeOutput["private_key_path"] = privateKeyPath
+			if pkPassExists {
+				snowflakeOutput["private_key_passphrase"] = privateKeyPassphrase
+			}
+			// Do NOT include password if using key pair auth
+		} else if passwordExists {
+			// Fallback to password if key pair details aren't provided
 			snowflakeOutput["password"] = password
+			// Consider adding a warning log here about using password auth
 		}
-		// TODO: Add role, warehouse, key pair auth details if needed based on params
+
 		outputConf["snowflake_put"] = snowflakeOutput
 
 	case "s3":

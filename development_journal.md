@@ -133,4 +133,55 @@
     - Expand Benthos integration (configuration generation based on Connections, process execution).
     - Add input validation to all API handlers.
     - Create SQL setup script for database tables.
-    - Configure logging and error handling more robustly. 
+    - Configure logging and error handling more robustly.
+
+## 2025-04-10
+
+- **Goal:** Implement Benthos integration, API validation, SQL schema, and initial structured logging.
+- **Actions:**
+    - **Benthos Integration:**
+        - Created `internal/benthos/config_generator.go` with logic to generate Benthos YAML from task/connection data. Includes parsing connection strings and adding Bloblang processors from `TransformationRules`.
+        - Created `internal/benthos/executor.go` to run Benthos pipelines using `os/exec`.
+        - Created `internal/benthos/config_generator_test.go` with initial test cases (S3->Snowflake, SQLServer->S3, error cases).
+        - Updated Temporal activities (`internal/temporal/activities.go`) to use the new generator and executor, removing old placeholders.
+        - Updated Temporal workflow (`internal/temporal/replication_workflow.go`) to call the new Benthos execution activity, simplifying workflow steps and adding robust error handling via `defer`.
+    - **API Input Validation:**
+        - Added `go-playground/validator/v10` dependency.
+        - Added `validate` tags to `data.Connection`, `data.ReplicationTask`, `data.BenthosConfiguration` structs (`internal/data/models.go`).
+        - Added validator instance to `APIHandler` (`internal/api/handlers.go`).
+        - Implemented validation checks in all Create/Update handlers in `internal/api/handlers.go`.
+    - **SQL Schema:**
+        - Created `schema.sql` file with `CREATE TABLE` statements for `Connections`, `ReplicationTasks`, `ReplicationRuns`, `BenthosConfigurations`, including constraints and basic indexes.
+    - **Structured Logging:**
+        - Added `zerolog` dependency.
+        - Initialized `zerolog.Logger` in `cmd/server/main.go`.
+        - Injected logger into `APIHandler`.
+        - Replaced standard `log` calls with `zerolog` calls in `main.go` and `internal/api/handlers.go`.
+    - **Dependency Management:**
+        - Ran `go mod tidy` to fix Temporal SDK dependency issues.
+    - **Database Logic:**
+        - Confirmed that actual SQL implementations for `Connections`, `ReplicationTasks`, `BenthosConfigurations`, and `ReplicationRuns` CRUD operations were already present in `internal/data/`.
+    - **Git:**
+        - Committed and pushed all changes to the remote repository.
+- **Status:** Core functionality for Benthos config generation/execution, API validation, schema definition, and basic structured logging is implemented. Database interaction logic is present.
+- **Potential Next Steps / Refinements:**
+    - **Benthos Config Generator:**
+        - Add secure credential handling (e.g., prioritize IAM/env vars for S3/GCP over connection string values).
+        - Make configuration parameters more flexible (e.g., Snowflake stage name, file formats).
+        - Add support for more connection types.
+        - Implement more robust parsing/validation for `DataSelectionCriteria`.
+    - **API Validation:**
+        - Add more specific validation rules (e.g., check connection `Type` values, validate cron syntax, check referenced IDs exist).
+        - Improve client-facing validation error messages.
+    - **Logging & Error Handling:**
+        - Add request logging middleware (method, path, duration, status, request ID).
+        - Propagate logger into service/data layers.
+        - Define and use custom error types.
+    - **Service Logic:**
+        - Review/enhance task start/stop logic, Temporal interactions.
+    - **Testing:**
+        - Add more unit/integration tests (service layer, data layer mocks, API endpoint tests).
+    - **Documentation:**
+        - Update `docs/overview.md` and add detailed feature documentation.
+    - **Configuration:**
+        - Move hardcoded values (DSN, Temporal address, default ports) to config files or environment variables. 

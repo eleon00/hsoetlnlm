@@ -13,19 +13,22 @@ import (
 	"github.com/eleon00/hsoetlnlm/internal/data"
 	"github.com/eleon00/hsoetlnlm/internal/service"
 	"github.com/go-playground/validator/v10" // Import validator
+	"github.com/rs/zerolog"                  // Import zerolog
 )
 
 // APIHandler holds dependencies for API handlers, like the service layer.
 type APIHandler struct {
 	svc       service.Service
 	validator *validator.Validate // Add validator field
+	logger    zerolog.Logger      // Add logger field
 }
 
 // NewAPIHandler creates a new APIHandler with the necessary dependencies.
-func NewAPIHandler(svc service.Service) *APIHandler {
+func NewAPIHandler(svc service.Service, logger zerolog.Logger) *APIHandler {
 	return &APIHandler{
 		svc:       svc,
 		validator: validator.New(), // Initialize validator
+		logger:    logger,          // Store the logger
 	}
 }
 
@@ -73,7 +76,8 @@ func (h *APIHandler) ListConnectionsHandler(w http.ResponseWriter, r *http.Reque
 
 	connections, err := h.svc.ListConnections(r.Context())
 	if err != nil {
-		log.Printf("Error listing connections: %v", err)
+		// Use injected logger
+		h.logger.Error().Err(err).Msg("Error listing connections")
 		respondWithError(w, http.StatusInternalServerError, "Failed to retrieve connections")
 		return
 	}
@@ -92,7 +96,8 @@ func (h *APIHandler) CreateConnectionHandler(w http.ResponseWriter, r *http.Requ
 	var input data.Connection
 	err := json.NewDecoder(r.Body).Decode(&input)
 	if err != nil {
-		log.Printf("Error decoding create connection request: %v", err)
+		// Use injected logger
+		h.logger.Error().Err(err).Msg("Error decoding create connection request")
 		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
 		return
 	}
@@ -101,16 +106,15 @@ func (h *APIHandler) CreateConnectionHandler(w http.ResponseWriter, r *http.Requ
 	// --- Input Validation ---
 	err = h.validator.Struct(input)
 	if err != nil {
-		// Handle validation errors
 		var validationErrors validator.ValidationErrors
 		if errors.As(err, &validationErrors) {
-			// Construct a user-friendly error message
-			// For simplicity, just log the errors and return a generic bad request
-			log.Printf("Validation errors for create connection: %v", validationErrors)
+			// Use injected logger
+			h.logger.Warn().Err(err).Interface("validation_errors", validationErrors).Msg("Validation errors for create connection")
+			// TODO: Consider returning specific validation errors to client
 			respondWithError(w, http.StatusBadRequest, "Invalid input: validation failed")
 		} else {
-			// Some other error during validation?
-			log.Printf("Unexpected error during validation: %v", err)
+			// Use injected logger
+			h.logger.Error().Err(err).Msg("Unexpected error during validation")
 			respondWithError(w, http.StatusInternalServerError, "Validation error")
 		}
 		return
@@ -119,7 +123,8 @@ func (h *APIHandler) CreateConnectionHandler(w http.ResponseWriter, r *http.Requ
 
 	newID, err := h.svc.CreateConnection(r.Context(), &input)
 	if err != nil {
-		log.Printf("Error creating connection: %v", err)
+		// Use injected logger
+		h.logger.Error().Err(err).Msg("Error creating connection")
 		respondWithError(w, http.StatusInternalServerError, "Failed to create connection")
 		return
 	}
@@ -154,7 +159,8 @@ func (h *APIHandler) GetConnectionHandler(w http.ResponseWriter, r *http.Request
 		if errors.Is(err, sql.ErrNoRows) {
 			respondWithError(w, http.StatusNotFound, "Connection not found")
 		} else {
-			log.Printf("Error getting connection %d: %v", id, err)
+			// Use injected logger
+			h.logger.Error().Err(err).Int64("connection_id", id).Msg("Error getting connection")
 			respondWithError(w, http.StatusInternalServerError, "Failed to retrieve connection")
 		}
 		return
@@ -182,7 +188,8 @@ func (h *APIHandler) UpdateConnectionHandler(w http.ResponseWriter, r *http.Requ
 	var input data.Connection
 	err = json.NewDecoder(r.Body).Decode(&input)
 	if err != nil {
-		log.Printf("Error decoding update connection request: %v", err)
+		// Use injected logger
+		h.logger.Error().Err(err).Msg("Error decoding update connection request")
 		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
 		return
 	}
@@ -195,10 +202,12 @@ func (h *APIHandler) UpdateConnectionHandler(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		var validationErrors validator.ValidationErrors
 		if errors.As(err, &validationErrors) {
-			log.Printf("Validation errors for update connection %d: %v", id, validationErrors)
+			// Use injected logger
+			h.logger.Warn().Err(err).Int64("connection_id", id).Interface("validation_errors", validationErrors).Msg("Validation errors for update connection")
 			respondWithError(w, http.StatusBadRequest, "Invalid input: validation failed")
 		} else {
-			log.Printf("Unexpected error during validation for update connection %d: %v", id, err)
+			// Use injected logger
+			h.logger.Error().Err(err).Int64("connection_id", id).Msg("Unexpected error during validation for update connection")
 			respondWithError(w, http.StatusInternalServerError, "Validation error")
 		}
 		return
@@ -210,7 +219,8 @@ func (h *APIHandler) UpdateConnectionHandler(w http.ResponseWriter, r *http.Requ
 		if errors.Is(err, sql.ErrNoRows) { // Assuming service/repo might return this
 			respondWithError(w, http.StatusNotFound, "Connection not found")
 		} else {
-			log.Printf("Error updating connection %d: %v", id, err)
+			// Use injected logger
+			h.logger.Error().Err(err).Int64("connection_id", id).Msg("Error updating connection")
 			respondWithError(w, http.StatusInternalServerError, "Failed to update connection")
 		}
 		return
@@ -242,7 +252,8 @@ func (h *APIHandler) DeleteConnectionHandler(w http.ResponseWriter, r *http.Requ
 		if errors.Is(err, sql.ErrNoRows) { // Assuming service/repo might return this
 			respondWithError(w, http.StatusNotFound, "Connection not found")
 		} else {
-			log.Printf("Error deleting connection %d: %v", id, err)
+			// Use injected logger
+			h.logger.Error().Err(err).Int64("connection_id", id).Msg("Error deleting connection")
 			respondWithError(w, http.StatusInternalServerError, "Failed to delete connection")
 		}
 		return
@@ -263,7 +274,8 @@ func (h *APIHandler) ListReplicationTasksHandler(w http.ResponseWriter, r *http.
 
 	tasks, err := h.svc.ListReplicationTasks(r.Context())
 	if err != nil {
-		log.Printf("Error listing replication tasks: %v", err)
+		// Use injected logger
+		h.logger.Error().Err(err).Msg("Error listing replication tasks")
 		respondWithError(w, http.StatusInternalServerError, "Failed to retrieve replication tasks")
 		return
 	}
@@ -282,7 +294,8 @@ func (h *APIHandler) CreateReplicationTaskHandler(w http.ResponseWriter, r *http
 	var input data.ReplicationTask
 	err := json.NewDecoder(r.Body).Decode(&input)
 	if err != nil {
-		log.Printf("Error decoding create replication task request: %v", err)
+		// Use injected logger
+		h.logger.Error().Err(err).Msg("Error decoding create replication task request")
 		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
 		return
 	}
@@ -293,10 +306,12 @@ func (h *APIHandler) CreateReplicationTaskHandler(w http.ResponseWriter, r *http
 	if err != nil {
 		var validationErrors validator.ValidationErrors
 		if errors.As(err, &validationErrors) {
-			log.Printf("Validation errors for create replication task: %v", validationErrors)
+			// Use injected logger
+			h.logger.Warn().Err(err).Interface("validation_errors", validationErrors).Msg("Validation errors for create replication task")
 			respondWithError(w, http.StatusBadRequest, "Invalid input: validation failed")
 		} else {
-			log.Printf("Unexpected error during validation: %v", err)
+			// Use injected logger
+			h.logger.Error().Err(err).Msg("Unexpected error during validation")
 			respondWithError(w, http.StatusInternalServerError, "Validation error")
 		}
 		return
@@ -305,7 +320,8 @@ func (h *APIHandler) CreateReplicationTaskHandler(w http.ResponseWriter, r *http
 
 	newID, err := h.svc.CreateReplicationTask(r.Context(), &input)
 	if err != nil {
-		log.Printf("Error creating replication task: %v", err)
+		// Use injected logger
+		h.logger.Error().Err(err).Msg("Error creating replication task")
 		respondWithError(w, http.StatusInternalServerError, "Failed to create replication task")
 		return
 	}
@@ -336,7 +352,8 @@ func (h *APIHandler) GetReplicationTaskHandler(w http.ResponseWriter, r *http.Re
 		if errors.Is(err, sql.ErrNoRows) {
 			respondWithError(w, http.StatusNotFound, "Replication task not found")
 		} else {
-			log.Printf("Error getting replication task %d: %v", id, err)
+			// Use injected logger
+			h.logger.Error().Err(err).Int64("task_id", id).Msg("Error getting replication task")
 			respondWithError(w, http.StatusInternalServerError, "Failed to retrieve replication task")
 		}
 		return
@@ -364,7 +381,8 @@ func (h *APIHandler) UpdateReplicationTaskHandler(w http.ResponseWriter, r *http
 	var input data.ReplicationTask
 	err = json.NewDecoder(r.Body).Decode(&input)
 	if err != nil {
-		log.Printf("Error decoding update replication task request: %v", err)
+		// Use injected logger
+		h.logger.Error().Err(err).Msg("Error decoding update replication task request")
 		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
 		return
 	}
@@ -377,10 +395,12 @@ func (h *APIHandler) UpdateReplicationTaskHandler(w http.ResponseWriter, r *http
 	if err != nil {
 		var validationErrors validator.ValidationErrors
 		if errors.As(err, &validationErrors) {
-			log.Printf("Validation errors for update replication task %d: %v", id, validationErrors)
+			// Use injected logger
+			h.logger.Warn().Err(err).Int64("task_id", id).Interface("validation_errors", validationErrors).Msg("Validation errors for update replication task")
 			respondWithError(w, http.StatusBadRequest, "Invalid input: validation failed")
 		} else {
-			log.Printf("Unexpected error during validation for update replication task %d: %v", id, err)
+			// Use injected logger
+			h.logger.Error().Err(err).Int64("task_id", id).Msg("Unexpected error during validation for update replication task")
 			respondWithError(w, http.StatusInternalServerError, "Validation error")
 		}
 		return
@@ -392,7 +412,8 @@ func (h *APIHandler) UpdateReplicationTaskHandler(w http.ResponseWriter, r *http
 		if errors.Is(err, sql.ErrNoRows) { // Assuming service/repo might return this
 			respondWithError(w, http.StatusNotFound, "Replication task not found")
 		} else {
-			log.Printf("Error updating replication task %d: %v", id, err)
+			// Use injected logger
+			h.logger.Error().Err(err).Int64("task_id", id).Msg("Error updating replication task")
 			respondWithError(w, http.StatusInternalServerError, "Failed to update replication task")
 		}
 		return
@@ -422,7 +443,8 @@ func (h *APIHandler) DeleteReplicationTaskHandler(w http.ResponseWriter, r *http
 		if errors.Is(err, sql.ErrNoRows) { // Assuming service/repo might return this
 			respondWithError(w, http.StatusNotFound, "Replication task not found")
 		} else {
-			log.Printf("Error deleting replication task %d: %v", id, err)
+			// Use injected logger
+			h.logger.Error().Err(err).Int64("task_id", id).Msg("Error deleting replication task")
 			respondWithError(w, http.StatusInternalServerError, "Failed to delete replication task")
 		}
 		return
@@ -443,7 +465,8 @@ func (h *APIHandler) ListBenthosConfigsHandler(w http.ResponseWriter, r *http.Re
 
 	configs, err := h.svc.ListBenthosConfigs(r.Context())
 	if err != nil {
-		log.Printf("Error listing benthos configs: %v", err)
+		// Use injected logger
+		h.logger.Error().Err(err).Msg("Error listing benthos configs")
 		respondWithError(w, http.StatusInternalServerError, "Failed to retrieve benthos configs")
 		return
 	}
@@ -462,7 +485,8 @@ func (h *APIHandler) CreateBenthosConfigHandler(w http.ResponseWriter, r *http.R
 	var input data.BenthosConfiguration
 	err := json.NewDecoder(r.Body).Decode(&input)
 	if err != nil {
-		log.Printf("Error decoding create benthos config request: %v", err)
+		// Use injected logger
+		h.logger.Error().Err(err).Msg("Error decoding create benthos config request")
 		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
 		return
 	}
@@ -473,10 +497,12 @@ func (h *APIHandler) CreateBenthosConfigHandler(w http.ResponseWriter, r *http.R
 	if err != nil {
 		var validationErrors validator.ValidationErrors
 		if errors.As(err, &validationErrors) {
-			log.Printf("Validation errors for create benthos config: %v", validationErrors)
+			// Use injected logger
+			h.logger.Warn().Err(err).Interface("validation_errors", validationErrors).Msg("Validation errors for create benthos config")
 			respondWithError(w, http.StatusBadRequest, "Invalid input: validation failed")
 		} else {
-			log.Printf("Unexpected error during validation: %v", err)
+			// Use injected logger
+			h.logger.Error().Err(err).Msg("Unexpected error during validation")
 			respondWithError(w, http.StatusInternalServerError, "Validation error")
 		}
 		return
@@ -485,7 +511,8 @@ func (h *APIHandler) CreateBenthosConfigHandler(w http.ResponseWriter, r *http.R
 
 	newID, err := h.svc.CreateBenthosConfig(r.Context(), &input)
 	if err != nil {
-		log.Printf("Error creating benthos config: %v", err)
+		// Use injected logger
+		h.logger.Error().Err(err).Msg("Error creating benthos config")
 		respondWithError(w, http.StatusInternalServerError, "Failed to create benthos config")
 		return
 	}
@@ -515,7 +542,8 @@ func (h *APIHandler) GetBenthosConfigHandler(w http.ResponseWriter, r *http.Requ
 		if errors.Is(err, sql.ErrNoRows) {
 			respondWithError(w, http.StatusNotFound, "Benthos config not found")
 		} else {
-			log.Printf("Error getting benthos config %d: %v", id, err)
+			// Use injected logger
+			h.logger.Error().Err(err).Int64("config_id", id).Msg("Error getting benthos config")
 			respondWithError(w, http.StatusInternalServerError, "Failed to retrieve benthos config")
 		}
 		return
@@ -542,7 +570,8 @@ func (h *APIHandler) UpdateBenthosConfigHandler(w http.ResponseWriter, r *http.R
 	var input data.BenthosConfiguration
 	err = json.NewDecoder(r.Body).Decode(&input)
 	if err != nil {
-		log.Printf("Error decoding update benthos config request: %v", err)
+		// Use injected logger
+		h.logger.Error().Err(err).Msg("Error decoding update benthos config request")
 		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
 		return
 	}
@@ -555,10 +584,12 @@ func (h *APIHandler) UpdateBenthosConfigHandler(w http.ResponseWriter, r *http.R
 	if err != nil {
 		var validationErrors validator.ValidationErrors
 		if errors.As(err, &validationErrors) {
-			log.Printf("Validation errors for update benthos config %d: %v", id, validationErrors)
+			// Use injected logger
+			h.logger.Warn().Err(err).Int64("config_id", id).Interface("validation_errors", validationErrors).Msg("Validation errors for update benthos config")
 			respondWithError(w, http.StatusBadRequest, "Invalid input: validation failed")
 		} else {
-			log.Printf("Unexpected error during validation for update benthos config %d: %v", id, err)
+			// Use injected logger
+			h.logger.Error().Err(err).Int64("config_id", id).Msg("Unexpected error during validation for update benthos config")
 			respondWithError(w, http.StatusInternalServerError, "Validation error")
 		}
 		return
@@ -570,7 +601,8 @@ func (h *APIHandler) UpdateBenthosConfigHandler(w http.ResponseWriter, r *http.R
 		if errors.Is(err, sql.ErrNoRows) {
 			respondWithError(w, http.StatusNotFound, "Benthos config not found")
 		} else {
-			log.Printf("Error updating benthos config %d: %v", id, err)
+			// Use injected logger
+			h.logger.Error().Err(err).Int64("config_id", id).Msg("Error updating benthos config")
 			respondWithError(w, http.StatusInternalServerError, "Failed to update benthos config")
 		}
 		return
@@ -599,7 +631,8 @@ func (h *APIHandler) DeleteBenthosConfigHandler(w http.ResponseWriter, r *http.R
 		if errors.Is(err, sql.ErrNoRows) {
 			respondWithError(w, http.StatusNotFound, "Benthos config not found")
 		} else {
-			log.Printf("Error deleting benthos config %d: %v", id, err)
+			// Use injected logger
+			h.logger.Error().Err(err).Int64("config_id", id).Msg("Error deleting benthos config")
 			respondWithError(w, http.StatusInternalServerError, "Failed to delete benthos config")
 		}
 		return
@@ -634,7 +667,8 @@ func (h *APIHandler) ListReplicationRunsHandler(w http.ResponseWriter, r *http.R
 
 	runs, err := h.svc.ListReplicationRuns(r.Context(), taskID)
 	if err != nil {
-		log.Printf("Error listing replication runs for task %d: %v", taskID, err)
+		// Use injected logger
+		h.logger.Error().Err(err).Int64("task_id", taskID).Msg("Error listing replication runs")
 		respondWithError(w, http.StatusInternalServerError, "Failed to retrieve replication runs")
 		return
 	}
@@ -663,7 +697,8 @@ func (h *APIHandler) GetReplicationRunHandler(w http.ResponseWriter, r *http.Req
 		if errors.Is(err, sql.ErrNoRows) {
 			respondWithError(w, http.StatusNotFound, "Replication run not found")
 		} else {
-			log.Printf("Error getting replication run %d: %v", runID, err)
+			// Use injected logger
+			h.logger.Error().Err(err).Int64("run_id", runID).Msg("Error getting replication run details")
 			respondWithError(w, http.StatusInternalServerError, "Failed to retrieve replication run details")
 		}
 		return

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,17 +12,26 @@ import (
 	"github.com/eleon00/hsoetlnlm/internal/data"
 	"github.com/eleon00/hsoetlnlm/internal/service"
 	"github.com/eleon00/hsoetlnlm/internal/temporal"
+	"github.com/rs/zerolog"
 )
 
 func main() {
-	// Configuration (replace with actual config loading later)
-	// For now, using a placeholder DSN. Ensure your DB is running and accessible.
-	// Example DSN format for SQL Server: "sqlserver://username:password@host:port?database=dbname"
-	dsn := "placeholder_dsn" // <-- IMPORTANT: Replace with your actual database connection string
-	if dsn == "placeholder_dsn" {
-		log.Println("WARNING: Using placeholder DSN. Update cmd/server/main.go with your actual database connection string.")
-		// You might want to exit here in a real app if config is mandatory
-		// log.Fatal("Database DSN is not configured.")
+	// Initialize structured logger (zerolog)
+	// Configure for console output with reasonable defaults
+	logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
+	logger.Info().Msg("Application starting up...")
+
+	// Configuration from Environment Variables
+	dsn := os.Getenv("APP_DB_DSN")
+	if dsn == "" {
+		dsn = "postgres://user:password@localhost:5432/hsoetlnlm_db?sslmode=disable" // Default for local non-docker
+		logger.Warn().Str("dsn", dsn).Msg("APP_DB_DSN not set, using default")
+	}
+
+	temporalHostPort := os.Getenv("TEMPORAL_HOST_PORT")
+	if temporalHostPort == "" {
+		temporalHostPort = "localhost:7233" // Default for local non-docker
+		logger.Warn().Str("hostPort", temporalHostPort).Msg("TEMPORAL_HOST_PORT not set, using default")
 	}
 
 	// Initialize Data Layer
@@ -32,7 +40,7 @@ func main() {
 	// or the database is not reachable/configured correctly.
 	db, err := data.NewDB(dsn)
 	if err != nil {
-		log.Printf("WARNING: Failed to initialize database connection: %v. Continuing without DB...", err)
+		logger.Warn().Err(err).Msg("Failed to initialize database connection. Continuing without DB...")
 		// Handle the case where DB connection fails. Maybe run in a limited mode?
 		// For now, we'll proceed, but repository operations will fail.
 		db = nil // Ensure db is nil if connection failed
@@ -40,10 +48,10 @@ func main() {
 		// Only defer close if db was successfully initialized
 		defer func() {
 			if err := db.Close(); err != nil {
-				log.Printf("Error closing database: %v", err)
+				logger.Error().Err(err).Msg("Error closing database")
 			}
 		}()
-		log.Println("Database connection pool initialized (or prepared).")
+		logger.Info().Msg("Database connection pool initialized (or prepared).")
 	}
 
 	// Initialize Service Layer
@@ -51,24 +59,24 @@ func main() {
 	// If db is nil due to connection failure, the service layer might
 	// need to handle this gracefully or fail operations that require the DB.
 	appService := service.NewService(db) // db might be nil here!
-	log.Println("Service layer initialized.")
+	logger.Info().Msg("Service layer initialized.")
 
 	// Initialize Temporal client (optional)
 	var temporalClient *temporal.Client
-	// Uncomment to enable Temporal (requires a running Temporal server)
+	// Uncomment to enable Temporal
+	// Make sure TEMPORAL_HOST_PORT env var is set correctly for docker-compose (e.g., "temporal:7233")
+	// or leave unset for local default ("localhost:7233")
 	/*
 		temporalClient, err = temporal.NewClient(&temporal.ClientOptions{
-			HostPort:    "localhost:7233", // Default Temporal server address
+			HostPort:    temporalHostPort, // Use host/port from env/default
 			Namespace:   "default",
 			ServiceName: "hsoetlnlm",
 		})
 		if err != nil {
-			log.Printf("WARNING: Failed to initialize Temporal client: %v. Continuing without Temporal...", err)
+			logger.Warn().Err(err).Str("hostPort", temporalHostPort).Msg("Failed to initialize Temporal client. Continuing without Temporal...")
 		} else {
 			defer temporalClient.Close()
-			log.Println("Temporal client initialized.")
-
-			// Set the client as the global workflow client implementation
+			logger.Info().Str("hostPort", temporalHostPort).Msg("Temporal client initialized.")
 			service.WorkflowClientImpl = temporalClient
 		}
 	*/
@@ -80,30 +88,30 @@ func main() {
 			TaskQueue: "replication-tasks",
 		})
 		if err != nil {
-			log.Printf("WARNING: Failed to initialize Temporal worker: %v", err)
+			logger.Warn().Err(err).Msg("Failed to initialize Temporal worker")
 		} else {
 			// Start the worker
 			err = temporalWorker.Start()
 			if err != nil {
-				log.Printf("WARNING: Failed to start Temporal worker: %v", err)
+				logger.Warn().Err(err).Msg("Failed to start Temporal worker")
 			} else {
-				log.Println("Temporal worker started successfully.")
+				logger.Info().Msg("Temporal worker started successfully.")
 				defer temporalWorker.Stop()
 			}
 		}
 	}
 
-	// Initialize API Layer
-	apiHandler := api.NewAPIHandler(appService)
-	log.Println("API handler initialized.")
+	// Initialize API Layer - PASS THE LOGGER HERE
+	apiHandler := api.NewAPIHandler(appService, logger)
+	logger.Info().Msg("API handler initialized.")
 
 	// Create the main router
 	router := api.NewRouter(apiHandler)
-	log.Println("Router initialized.")
+	logger.Info().Msg("Router initialized.")
 
 	// Define the port the server will listen on
 	port := ":8080"
-	log.Printf("Starting server on http://localhost%s\n", port)
+	logger.Info().Str("port", port).Msgf("Starting server on http://localhost%s", port)
 
 	// Create HTTP server
 	server := &http.Server{
@@ -117,17 +125,17 @@ func main() {
 	// Start server in a goroutine so it doesn't block
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Failed to start server: %v", err)
+			logger.Fatal().Err(err).Msg("Failed to start server")
 		}
 	}()
-	log.Println("Server started successfully.")
+	logger.Info().Msg("Server started successfully.")
 
 	// Setup graceful shutdown
 	// Wait for interrupt signal to gracefully shutdown the server
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("Server is shutting down...")
+	logger.Info().Msg("Server is shutting down...")
 
 	// Create a deadline for shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -135,7 +143,7 @@ func main() {
 
 	// Shutdown the server
 	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("Server shutdown failed: %v", err)
+		logger.Fatal().Err(err).Msg("Server shutdown failed")
 	}
-	log.Println("Server shutdown complete")
+	logger.Info().Msg("Server shutdown complete")
 }

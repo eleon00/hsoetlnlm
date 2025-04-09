@@ -16,8 +16,8 @@ func (db *DB) CreateReplicationRun(ctx context.Context, run *ReplicationRun) (in
 
 	query := `
 		INSERT INTO ReplicationRuns (ReplicationTaskID, StartTime, Status, TemporalRunID, CreatedAt)
-		OUTPUT INSERTED.ID
-		VALUES (@p1, @p2, @p3, @p4, @p5);`
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING ID;`
 
 	now := time.Now()
 	var insertedID int64
@@ -48,7 +48,7 @@ func (db *DB) GetReplicationRun(ctx context.Context, id int64) (*ReplicationRun,
 	query := `
 		SELECT ID, ReplicationTaskID, StartTime, EndTime, Status, ErrorDetails, TemporalRunID, CreatedAt
 		FROM ReplicationRuns
-		WHERE ID = @p1;`
+		WHERE ID = $1;`
 
 	row := db.SQL.QueryRowContext(ctx, query, id)
 	var run ReplicationRun
@@ -95,7 +95,7 @@ func (db *DB) ListReplicationRunsForTask(ctx context.Context, taskID int64) ([]*
 	query := `
 		SELECT ID, ReplicationTaskID, StartTime, EndTime, Status, ErrorDetails, TemporalRunID, CreatedAt
 		FROM ReplicationRuns
-		WHERE ReplicationTaskID = @p1
+		WHERE ReplicationTaskID = $1
 		ORDER BY StartTime DESC;` // Show most recent first
 
 	rows, err := db.SQL.QueryContext(ctx, query, taskID)
@@ -151,8 +151,8 @@ func (db *DB) UpdateReplicationRunStatus(ctx context.Context, id int64, status s
 
 	query := `
 		UPDATE ReplicationRuns
-		SET Status = @p1, ErrorDetails = @p2, EndTime = @p3
-		WHERE ID = @p4;`
+		SET Status = $1, ErrorDetails = $2, EndTime = $3
+		WHERE ID = $4;`
 
 	// Convert *time.Time to sql.NullTime
 	var nullEndTime sql.NullTime

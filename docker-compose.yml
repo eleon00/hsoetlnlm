@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  # Application Service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080" # Expose app port to host
+    environment:
+      # Configuration via environment variables
+      # These will override defaults in main.go if implemented
+      APP_DB_DSN: "postgres://user:password@db:5432/hsoetlnlm_db?sslmode=disable"
+      TEMPORAL_HOST_PORT: "temporal:7233"
+      # Add other env vars as needed (e.g., log level)
+    depends_on:
+      - db
+      - temporal
+    # If you need live code reloading for development (not recommended for prod):
+    # volumes:
+    #   - .:/app
+    # command: go run cmd/server/main.go
+
+  # Database Service (PostgreSQL)
+  db:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_DB: hsoetlnlm_db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432" # Expose DB port to host (optional, for debugging/external tools)
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Persist data
+
+  # Temporal Server Service
+  temporal:
+    image: temporalio/server:1.22.3 # Use a specific stable version
+    ports:
+      - "7233:7233" # Expose frontend gRPC port
+      # - "7234:7234" # Internal gRPC port (usually not needed from host)
+      # - "7235:7235" # Membership port (usually not needed from host)
+    environment:
+      - DB=postgresql
+      - DB_PORT=5432
+      - DB_HOST=db
+      - DB_USER=user
+      - POSTGRES_PWD=password
+      - DB_DATABASE=hsoetlnlm_db # Use the same DB as our app, or a separate one
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml # Embedded dynamic config
+    depends_on:
+      - db
+
+  # Temporal Web UI (Uncomment to enable)
+  temporal-web:
+    image: temporalio/web:1.15.0 # Try a newer version like 1.22.0 or check Docker Hub for available tags
+    ports:
+      - "8088:8088"
+    environment:
+      - TEMPORAL_GRPC_ENDPOINT=temporal:7233
+      # Add TLS if needed for connection to temporal service
+      # - TEMPORAL_TLS_CERT_PATH=
+      # - TEMPORAL_TLS_KEY_PATH=
+    depends_on:
+      - temporal # Wait for temporal service itself
+
+volumes:
+  postgres_data: # Define the named volume for DB data persistence 
