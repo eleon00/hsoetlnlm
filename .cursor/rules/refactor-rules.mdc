@@ -1,0 +1,11 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# Refactor code this way:
+
+1) Refactor the file in the same file, then test it.
+2) Based on the refactored code, split the file in the same folder, then test it.
+3) Move the files to the correct folders and update imports, then test it.

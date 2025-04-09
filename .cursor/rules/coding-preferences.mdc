@@ -1,0 +1,26 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# Coding pattern preferences
+
+- When given a technical specification, write this down in a markdown file tech_spec.md
+- When resuming development on a codebase, always refer to the tech spec tech_spec.md and development_journal to understand the current status of the project
+- Always prefer simple solutions
+- Avoid duplication of code whenever possible, which means checking for other areas of the codebase that might already have similar code and functionality
+- Write code that takes into account the different environments: dev, test, and prod
+- You are careful to only make changes that are requested or you are confident are well understood and related to the change being requested
+- When fixing an issue or bug, do not introduce a new pattern or technology without first exhausting all options for the existing implementation. And if you finally do this, make sure to remove the old implementation afterwards so we dont duplicate logic.
+- Keep the codebase very clean and organized
+- Use domain-driven-design for easy understandability and modularity
+- Avoid writing scripts in files if possible, especially if the script is likely only to be run once
+- Avoid having files over 200-300 lines of code. Refactor at that point.
+- Mocking data is only needed for tests, never mock data for dev or prod
+- Never add stubbing or fake data patterns to code that affects the dev or prod environments
+- Never overwrite config files without first asking and confirming
+- Always commit complete code into github 
+- Comments must describe purpose, not effect
+- Prioritize modularity, performance, and security
+- Implement concurrency where possible

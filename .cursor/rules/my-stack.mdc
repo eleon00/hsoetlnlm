@@ -1,0 +1,13 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# Technical stack
+
+- Golang for the backend
+- data-star.dev for the frontend
+- SQL databases, never JSON file storage
+- Separate databases for dev, test, and prod
+- Golang tests

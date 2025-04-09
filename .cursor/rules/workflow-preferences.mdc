@@ -1,0 +1,17 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# Coding workflow preferences
+
+- When creating a new project, create a development journal markdown file and use it as journal to help keep track of the project, milestones and conversations with user (me). 
+- When adding entries into the development journal, be thorough and always append to it, dont delete anything.
+- When resuming work on an existing project, refer to that development journal markdown file and continue with the remaining tasks listed in the journal.
+- Focus on the ares of code relevant to the task
+- Do not touch code that is unrelated to the task
+- Write thorough tests for all major functionality
+- Avoid making major changes to the patterns and architecture of how a feature works, after it has shown to work well, unless explicitly instructed
+- Always think about what other methods/functions and areas of code might be affected by code changes
+- Always write a detailed documentation in a /docs folder on every major feature you build. Create an overview.md that indexes all of the docs created
