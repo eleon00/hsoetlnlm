@@ -31,18 +31,19 @@ func (a *ActivitiesImpl) LoadReplicationTask(ctx context.Context, taskID int64) 
 
 // CreateReplicationRun creates a new replication run record
 func (a *ActivitiesImpl) CreateReplicationRun(ctx context.Context, taskID int64) (*data.ReplicationRun, error) {
-	// For now, we'll create a simple record manually
-	// In a real implementation, this would call a service method
+	// Call the service to create the run record in the database
 	run := &data.ReplicationRun{
 		ReplicationTaskID: taskID,
-		StartTime:         time.Now(),
-		Status:            "running",
-		CreatedAt:         time.Now(),
+		StartTime:         time.Now(),                              // Activity start time as DB start time
+		Status:            string(ReplicationWorkflowStateLoading), // Initial status after creation
+		// TemporalRunID can be added later if needed, maybe via update
 	}
 
-	// TODO: Store this run in the database and get an ID
-	// Placeholder ID for now
-	run.ID = time.Now().Unix()
+	newID, err := a.svc.CreateReplicationRun(ctx, run)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create replication run for task %d: %w", taskID, err)
+	}
+	run.ID = newID // Update run object with the returned ID
 
 	return run, nil
 }
@@ -114,8 +115,18 @@ func (a *ActivitiesImpl) StopBenthosPipeline(ctx context.Context, processID stri
 
 // UpdateReplicationRunStatus updates the status of a replication run
 func (a *ActivitiesImpl) UpdateReplicationRunStatus(ctx context.Context, runID int64, status string, errorMsg string) error {
-	// In a real implementation, this would update the database record
-	// For now, just log
-	fmt.Printf("Updating replication run %d: status=%s, error=%s\n", runID, status, errorMsg)
-	return nil
+	// Determine end time based on status
+	var endTime *time.Time
+	if status == string(ReplicationWorkflowStateCompleted) || status == string(ReplicationWorkflowStateFailed) {
+		now := time.Now()
+		endTime = &now
+	}
+
+	err := a.svc.UpdateReplicationRunStatus(ctx, runID, status, errorMsg, endTime)
+	if err != nil {
+		// Log the error but don't necessarily fail the activity,
+		// as the core workflow might have completed/failed anyway.
+		fmt.Printf("Non-fatal error updating replication run %d status: %v\n", runID, err)
+	}
+	return nil // Return nil to avoid Temporal retrying the activity just for this update failure
 }

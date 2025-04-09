@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"github.com/eleon00/hsoetlnlm/internal/data"
 	// Add other necessary imports like models, etc. later
@@ -38,6 +39,8 @@ type Service interface {
 	GetReplicationTaskStatus(ctx context.Context, taskID int64) (string, error)
 	ListReplicationRuns(ctx context.Context, taskID int64) ([]*data.ReplicationRun, error)
 	GetReplicationRunDetails(ctx context.Context, runID int64) (*data.ReplicationRun, error)
+	CreateReplicationRun(ctx context.Context, run *data.ReplicationRun) (int64, error)
+	UpdateReplicationRunStatus(ctx context.Context, id int64, status string, errorDetails string, endTime *time.Time) error
 
 	// ... other business logic methods
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	// Add specific database driver imports here later, e.g.:
 	// _ "github.com/lib/pq"
@@ -34,6 +35,12 @@ type Repository interface {
 	ListBenthosConfigs(ctx context.Context) ([]*BenthosConfiguration, error)
 	UpdateBenthosConfig(ctx context.Context, config *BenthosConfiguration) error
 	DeleteBenthosConfig(ctx context.Context, id int64) error
+
+	// ReplicationRun methods
+	CreateReplicationRun(ctx context.Context, run *ReplicationRun) (int64, error)
+	GetReplicationRun(ctx context.Context, id int64) (*ReplicationRun, error)
+	ListReplicationRunsForTask(ctx context.Context, taskID int64) ([]*ReplicationRun, error)
+	UpdateReplicationRunStatus(ctx context.Context, id int64, status string, errorDetails string, endTime *time.Time) error
 
 	// Placeholder methods for other resources
 	// GetReplicationRun(ctx context.Context, id int64) (*ReplicationRun, error)

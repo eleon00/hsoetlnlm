@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/eleon00/hsoetlnlm/internal/data"
 	"github.com/eleon00/hsoetlnlm/internal/service"
@@ -519,4 +520,68 @@ func (h *APIHandler) DeleteBenthosConfigHandler(w http.ResponseWriter, r *http.R
 	}
 
 	respondWithJSON(w, http.StatusNoContent, nil)
+}
+
+// --- Replication Run Handlers ---
+
+// ListReplicationRunsHandler handles GET requests to /replication-tasks/{task_id}/runs
+func (h *APIHandler) ListReplicationRunsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", http.MethodGet)
+		respondWithError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
+		return
+	}
+
+	// Extract task ID from URL path (assuming path like /replication-tasks/{task_id}/runs)
+	// This needs a proper router for robust extraction
+	pathParts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(pathParts) < 3 || pathParts[0] != "replication-tasks" || pathParts[2] != "runs" {
+		respondWithError(w, http.StatusBadRequest, "Invalid URL path format")
+		return
+	}
+	taskIDStr := pathParts[1]
+	taskID, err := strconv.ParseInt(taskIDStr, 10, 64)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid replication task ID")
+		return
+	}
+
+	runs, err := h.svc.ListReplicationRuns(r.Context(), taskID)
+	if err != nil {
+		log.Printf("Error listing replication runs for task %d: %v", taskID, err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to retrieve replication runs")
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, runs)
+}
+
+// GetReplicationRunHandler handles GET requests to /replication-runs/{run_id}
+func (h *APIHandler) GetReplicationRunHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", http.MethodGet)
+		respondWithError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
+		return
+	}
+
+	// Extract ID from URL path
+	runIDStr := r.URL.Path[len("/replication-runs/"):]
+	runID, err := strconv.ParseInt(runIDStr, 10, 64)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid replication run ID")
+		return
+	}
+
+	runDetails, err := h.svc.GetReplicationRunDetails(r.Context(), runID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			respondWithError(w, http.StatusNotFound, "Replication run not found")
+		} else {
+			log.Printf("Error getting replication run %d: %v", runID, err)
+			respondWithError(w, http.StatusInternalServerError, "Failed to retrieve replication run details")
+		}
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, runDetails)
 }

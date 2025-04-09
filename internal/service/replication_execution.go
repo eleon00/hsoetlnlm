@@ -69,22 +69,32 @@ func (s *service) GetReplicationTaskStatus(ctx context.Context, taskID int64) (s
 
 // ListReplicationRuns lists all runs for a specific replication task
 func (s *service) ListReplicationRuns(ctx context.Context, taskID int64) ([]*data.ReplicationRun, error) {
-	// In a real implementation, this would query the database
-	// For now, return empty slice
-	return []*data.ReplicationRun{}, nil
+	if s.repo == nil {
+		return nil, fmt.Errorf("service requires an initialized repository")
+	}
+	return s.repo.ListReplicationRunsForTask(ctx, taskID)
 }
 
 // GetReplicationRunDetails gets details of a specific replication run
 func (s *service) GetReplicationRunDetails(ctx context.Context, runID int64) (*data.ReplicationRun, error) {
-	// In a real implementation, this would query the database
-	// For now, return a placeholder
-	return &data.ReplicationRun{
-		ID:                runID,
-		ReplicationTaskID: 0, // Unknown
-		StartTime:         time.Now().Add(-time.Hour),
-		EndTime:           nil, // Still running
-		Status:            "running",
-		ErrorDetails:      "",
-		CreatedAt:         time.Now().Add(-time.Hour),
-	}, nil
+	if s.repo == nil {
+		return nil, fmt.Errorf("service requires an initialized repository")
+	}
+	return s.repo.GetReplicationRun(ctx, runID)
+}
+
+// CreateReplicationRun calls the repository to create a new run record.
+func (s *service) CreateReplicationRun(ctx context.Context, run *data.ReplicationRun) (int64, error) {
+	if s.repo == nil {
+		return 0, fmt.Errorf("service requires an initialized repository")
+	}
+	return s.repo.CreateReplicationRun(ctx, run)
+}
+
+// UpdateReplicationRunStatus calls the repository to update a run's status.
+func (s *service) UpdateReplicationRunStatus(ctx context.Context, id int64, status string, errorDetails string, endTime *time.Time) error {
+	if s.repo == nil {
+		return fmt.Errorf("service requires an initialized repository")
+	}
+	return s.repo.UpdateReplicationRunStatus(ctx, id, status, errorDetails, endTime)
 }

@@ -61,22 +61,33 @@ func NewRouter(handler *APIHandler) *http.ServeMux {
 	})
 
 	router.HandleFunc("/replication-tasks/", func(w http.ResponseWriter, r *http.Request) {
-		pathPrefix := "/replication-tasks/"
-		if !strings.HasPrefix(r.URL.Path, pathPrefix) || r.URL.Path == pathPrefix {
+		// Handle paths like /replication-tasks/{id} AND /replication-tasks/{task_id}/runs
+		pathParts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+
+		if len(pathParts) == 2 && pathParts[0] == "replication-tasks" {
+			// Assumed /replication-tasks/{id} - Delegate to existing handler
+			// Note: Simple routing, relies on handler to validate ID.
+			switch r.Method {
+			case http.MethodGet:
+				handler.GetReplicationTaskHandler(w, r)
+			case http.MethodPut:
+				handler.UpdateReplicationTaskHandler(w, r)
+			case http.MethodDelete:
+				handler.DeleteReplicationTaskHandler(w, r)
+			default:
+				w.Header().Set("Allow", "GET, PUT, DELETE")
+				respondWithError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
+			}
+		} else if len(pathParts) == 3 && pathParts[0] == "replication-tasks" && pathParts[2] == "runs" {
+			// Assumed /replication-tasks/{task_id}/runs
+			if r.Method == http.MethodGet {
+				handler.ListReplicationRunsHandler(w, r)
+			} else {
+				w.Header().Set("Allow", "GET")
+				respondWithError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
+			}
+		} else {
 			http.NotFound(w, r)
-			return
-		}
-		// Note: Simple routing, relies on handler to validate ID.
-		switch r.Method {
-		case http.MethodGet:
-			handler.GetReplicationTaskHandler(w, r)
-		case http.MethodPut:
-			handler.UpdateReplicationTaskHandler(w, r)
-		case http.MethodDelete:
-			handler.DeleteReplicationTaskHandler(w, r)
-		default:
-			w.Header().Set("Allow", "GET, PUT, DELETE")
-			respondWithError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
 		}
 	})
 
@@ -108,6 +119,23 @@ func NewRouter(handler *APIHandler) *http.ServeMux {
 			handler.DeleteBenthosConfigHandler(w, r)
 		default:
 			w.Header().Set("Allow", "GET, PUT, DELETE")
+			respondWithError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
+		}
+	})
+
+	// Replication Runs endpoints
+	router.HandleFunc("/replication-runs/", func(w http.ResponseWriter, r *http.Request) {
+		// Route for GET /replication-runs/{run_id}
+		if r.Method == http.MethodGet {
+			// Basic check for path structure
+			pathPrefix := "/replication-runs/"
+			if !strings.HasPrefix(r.URL.Path, pathPrefix) || r.URL.Path == pathPrefix {
+				http.NotFound(w, r)
+				return
+			}
+			handler.GetReplicationRunHandler(w, r)
+		} else {
+			w.Header().Set("Allow", "GET")
 			respondWithError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
 		}
 	})

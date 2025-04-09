@@ -100,4 +100,37 @@
     - Expand Benthos integration with ability to generate and execute pipelines.
     - Add input validation to API handlers (Connections, ReplicationTasks, BenthosConfigs).
     - Create SQL setup script for database tables (`Connections`, `ReplicationTasks`, `BenthosConfigurations`).
+    - Configure logging and error handling more robustly.
+
+## 2025-04-09 (Continued)
+
+- **Goal:** Implement actual SQL DB logic for `ReplicationTasks`, `BenthosConfigurations`, and `ReplicationRuns`.
+- **Actions:**
+    - Replaced placeholder functions with SQL queries in `internal/data/replication_tasks.go`.
+    - Replaced placeholder functions with SQL queries in `internal/data/benthos_configs.go`.
+    - Added CRUD method signatures for `ReplicationRuns` to `data.Repository` interface.
+    - Created `internal/data/replication_runs.go` with SQL implementations.
+    - Added `CreateReplicationRun` and `UpdateReplicationRunStatus` methods to `service.Service` interface.
+    - Implemented `CreateReplicationRun` and `UpdateReplicationRunStatus` in `internal/service/replication_execution.go`.
+    - Updated `ListReplicationRuns` and `GetReplicationRunDetails` in `internal/service/replication_execution.go` to use repository methods.
+    - Updated `CreateReplicationRun` and `UpdateReplicationRunStatus` activities in `internal/temporal/activities.go` to use service methods.
+- **Status:** Core database logic implemented for all main resources.
+- **Next Steps:**
+    - Add API endpoints for managing `ReplicationRuns` (e.g., listing runs for a task, getting run details).
+    - Expand Benthos integration (configuration generation based on Connections, process execution).
+    - Add input validation to all API handlers.
+    - Create SQL setup script for database tables.
+    - Configure logging and error handling more robustly.
+
+## 2025-04-09 (Continued)
+
+- **Goal:** Add API endpoints for managing `ReplicationRuns`.
+- **Actions:**
+    - Added `ListReplicationRunsHandler` and `GetReplicationRunHandler` to `internal/api/handlers.go`.
+    - Updated `internal/api/router.go` to handle routes `/replication-tasks/{task_id}/runs` (GET) and `/replication-runs/{run_id}` (GET).
+- **Status:** API endpoints for viewing replication run history and details implemented.
+- **Next Steps:**
+    - Expand Benthos integration (configuration generation based on Connections, process execution).
+    - Add input validation to all API handlers.
+    - Create SQL setup script for database tables.
     - Configure logging and error handling more robustly. 
