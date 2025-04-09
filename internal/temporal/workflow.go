@@ -47,17 +47,8 @@ type Activities interface {
 	// CreateReplicationRun creates a new replication run record in the database
 	CreateReplicationRun(ctx context.Context, taskID int64) (*data.ReplicationRun, error)
 
-	// GenerateBenthosConfig generates a Benthos configuration for the task
-	GenerateBenthosConfig(ctx context.Context, task *data.ReplicationTask) (*data.BenthosConfiguration, error)
-
-	// StartBenthosPipeline starts a Benthos pipeline with the given configuration
-	StartBenthosPipeline(ctx context.Context, config *data.BenthosConfiguration) (string, error)
-
-	// MonitorBenthosPipeline checks the status of a running Benthos pipeline
-	MonitorBenthosPipeline(ctx context.Context, processID string) (bool, error)
-
-	// StopBenthosPipeline stops a running Benthos pipeline
-	StopBenthosPipeline(ctx context.Context, processID string) error
+	// ExecuteBenthosPipeline generates config and runs the Benthos pipeline for the task
+	ExecuteBenthosPipelineActivity(ctx context.Context, taskID int64, runID int64) (output string, err error)
 
 	// UpdateReplicationRunStatus updates the status of a replication run
 	UpdateReplicationRunStatus(ctx context.Context, runID int64, status string, errorMsg string) error

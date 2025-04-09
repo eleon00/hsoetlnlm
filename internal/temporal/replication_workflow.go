@@ -35,90 +35,83 @@ func ReplicationWorkflow(ctx workflow.Context, taskID int64) error {
 		State:     ReplicationWorkflowStateInitialized,
 	}
 
+	// Defer cleanup/status update in case of workflow errors/cancellation
+	defer func() {
+		if ctx.Err() != nil || params.State != ReplicationWorkflowStateCompleted {
+			if params.State != ReplicationWorkflowStateFailed {
+				params.State = ReplicationWorkflowStateFailed
+				if params.ErrorMessage == "" {
+					params.ErrorMessage = fmt.Sprintf("Workflow failed or cancelled: %v", ctx.Err())
+				}
+				now := workflow.Now(ctx)
+				params.EndTime = &now
+			}
+			// Use a disconnected context for the final status update to ensure it runs
+			dcCtx, _ := workflow.NewDisconnectedContext(ctx)
+			finalUpdateOptions := workflow.ActivityOptions{
+				StartToCloseTimeout: time.Minute, // Short timeout for final update
+			}
+			dcCtx = workflow.WithActivityOptions(dcCtx, finalUpdateOptions)
+			err := workflow.ExecuteActivity(dcCtx, "UpdateReplicationRunStatus",
+				params.ReplicationRunID, string(params.State), params.ErrorMessage).Get(dcCtx, nil)
+			if err != nil {
+				logger.Error("Failed to perform final update of replication run status", "error", err, "RunID", params.ReplicationRunID)
+			}
+		}
+	}()
+
 	// Step 1: Create a replication run record in the database
 	var run *data.ReplicationRun
 	err := workflow.ExecuteActivity(ctx, "CreateReplicationRun", taskID).Get(ctx, &run)
 	if err != nil {
-		return handleWorkflowError(ctx, &params, "Failed to create replication run", err)
+		params.ErrorMessage = fmt.Sprintf("Failed to create replication run: %v", err)
+		return err // Error handled by defer
 	}
 	params.ReplicationRunID = run.ID
-	params.State = ReplicationWorkflowStateLoading
+	params.State = ReplicationWorkflowStateLoading // Run created, now loading task
 
-	// Step 2: Load the replication task configuration
-	var task *data.ReplicationTask
-	err = workflow.ExecuteActivity(ctx, "LoadReplicationTask", taskID).Get(ctx, &task)
+	// Step 2: Execute Benthos Pipeline Activity
+	// This activity now handles loading task, connections, generating config, and running benthos.
+	// Use a longer timeout for the Benthos execution itself.
+	benthosActivityOpts := workflow.ActivityOptions{
+		StartToCloseTimeout: time.Hour * 1,   // Example: Allow 1 hour for the pipeline run
+		HeartbeatTimeout:    time.Minute * 2, // Send heartbeats during long runs
+		RetryPolicy:         retryPolicy,     // Reuse the defined retry policy
+	}
+	benthosCtx := workflow.WithActivityOptions(ctx, benthosActivityOpts)
+
+	var benthosOutput string
+	err = workflow.ExecuteActivity(benthosCtx, "ExecuteBenthosPipelineActivity", taskID, params.ReplicationRunID).Get(benthosCtx, &benthosOutput)
 	if err != nil {
-		return handleWorkflowError(ctx, &params, "Failed to load replication task", err)
-	}
-	params.State = ReplicationWorkflowStateGeneratingConfig
-
-	// Step 3: Generate Benthos configuration
-	var benthosConfig *data.BenthosConfiguration
-	err = workflow.ExecuteActivity(ctx, "GenerateBenthosConfig", task).Get(ctx, &benthosConfig)
-	if err != nil {
-		return handleWorkflowError(ctx, &params, "Failed to generate Benthos config", err)
-	}
-	if benthosConfig != nil && benthosConfig.ID > 0 {
-		params.BenthosConfigID = &benthosConfig.ID
-	}
-	params.State = ReplicationWorkflowStateStartingBenthos
-
-	// Step 4: Start Benthos pipeline
-	var processID string
-	err = workflow.ExecuteActivity(ctx, "StartBenthosPipeline", benthosConfig).Get(ctx, &processID)
-	if err != nil {
-		return handleWorkflowError(ctx, &params, "Failed to start Benthos pipeline", err)
-	}
-	params.BenthosProcessID = processID
-	params.State = ReplicationWorkflowStateRunning
-
-	// Step 5: Monitor Benthos pipeline execution
-	// In a real implementation, this would be a loop with a selector to handle cancellation
-	var completed bool
-	monitorCtx := workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-		StartToCloseTimeout: time.Hour, // Longer timeout for monitoring
-		HeartbeatTimeout:    time.Minute,
-	})
-	err = workflow.ExecuteActivity(monitorCtx, "MonitorBenthosPipeline", processID).Get(ctx, &completed)
-	if err != nil {
-		// Try to stop the pipeline before returning error
-		_ = workflow.ExecuteActivity(ctx, "StopBenthosPipeline", processID).Get(ctx, nil)
-		return handleWorkflowError(ctx, &params, "Failed to monitor Benthos pipeline", err)
+		// Error occurred during Benthos execution
+		params.ErrorMessage = fmt.Sprintf("Benthos pipeline execution failed: %v", err)
+		// Benthos output might contain useful error info
+		logger.Error("Benthos execution failed", "error", err, "output", benthosOutput)
+		return err // Error handled by defer
 	}
 
-	// Step 6: Update run status to completed
+	// Benthos pipeline completed successfully (according to the activity)
+	logger.Info("Benthos pipeline executed successfully.", "output_snippet", truncateString(benthosOutput, 200))
+
+	// Step 3: Update run status to completed
 	now := workflow.Now(ctx)
 	params.EndTime = &now
 	params.State = ReplicationWorkflowStateCompleted
 	err = workflow.ExecuteActivity(ctx, "UpdateReplicationRunStatus",
-		params.ReplicationRunID, "success", "").Get(ctx, nil)
+		params.ReplicationRunID, string(params.State), "").Get(ctx, nil)
 	if err != nil {
-		logger.Error("Failed to update replication run status", "error", err)
-		// Continue even though update failed
+		logger.Error("Failed to update replication run status to completed", "error", err)
+		// Continue even though update failed, workflow itself succeeded.
 	}
 
 	logger.Info("Replication workflow completed successfully", "taskID", taskID)
 	return nil
 }
 
-// handleWorkflowError handles errors in the workflow, updates the run status, and returns the error
-func handleWorkflowError(ctx workflow.Context, params *WorkflowParams, msg string, err error) error {
-	logger := workflow.GetLogger(ctx)
-	logger.Error(msg, "error", err, "taskID", params.TaskID)
-
-	params.State = ReplicationWorkflowStateFailed
-	params.ErrorMessage = fmt.Sprintf("%s: %v", msg, err)
-
-	now := workflow.Now(ctx)
-	params.EndTime = &now
-
-	// Try to update the run status
-	updateErr := workflow.ExecuteActivity(ctx, "UpdateReplicationRunStatus",
-		params.ReplicationRunID, "failed", params.ErrorMessage).Get(ctx, nil)
-	if updateErr != nil {
-		logger.Error("Failed to update replication run status", "error", updateErr)
-		// Continue anyway
+// Helper function to truncate strings for logging (can be shared or moved)
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
 	}
-
-	return fmt.Errorf("%s: %w", msg, err)
+	return s[:maxLen] + "..."
 }

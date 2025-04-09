@@ -8,8 +8,8 @@ import (
 // Stores details for connecting to source or target systems.
 type Connection struct {
 	ID               int64     `json:"id"`
-	Name             string    `json:"name"`
-	Type             string    `json:"type"` // e.g., 'oracle', 'sqlserver', 's3', 'bigquery', 'snowflake', 'localfile'
+	Name             string    `json:"name" validate:"required"`
+	Type             string    `json:"type" validate:"required"` // e.g., 'oracle', 'sqlserver', 's3', 'bigquery', 'snowflake', 'localfile'
 	ConnectionString string    `json:"connection_string"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
@@ -19,14 +19,14 @@ type Connection struct {
 // Defines a data replication job.
 type ReplicationTask struct {
 	ID                    int64     `json:"id"`
-	Name                  string    `json:"name"`
-	SourceConnectionID    int64     `json:"source_connection_id"`
-	TargetConnectionID    int64     `json:"target_connection_id"`
-	Schedule              string    `json:"schedule,omitempty"` // e.g., cron expression
+	Name                  string    `json:"name" validate:"required"`
+	SourceConnectionID    int64     `json:"source_connection_id" validate:"required,gt=0"` // Must be positive
+	TargetConnectionID    int64     `json:"target_connection_id" validate:"required,gt=0"` // Must be positive
+	Schedule              string    `json:"schedule,omitempty"`                            // Optional
 	DataSelectionCriteria string    `json:"data_selection_criteria,omitempty"`
-	TransformationRules   string    `json:"transformation_rules,omitempty"` // e.g., Benthos Bloblang
+	TransformationRules   string    `json:"transformation_rules,omitempty"`
 	TemporalWorkflowID    string    `json:"temporal_workflow_id,omitempty"`
-	Status                string    `json:"status"` // e.g., 'active', 'inactive', 'failed'
+	Status                string    `json:"status" validate:"required"` // e.g., 'active', 'inactive', 'failed'
 	CreatedAt             time.Time `json:"created_at"`
 	UpdatedAt             time.Time `json:"updated_at"`
 }
@@ -48,8 +48,8 @@ type ReplicationRun struct {
 // Stores reusable Benthos pipeline configurations.
 type BenthosConfiguration struct {
 	ID            int64     `json:"id"`
-	Name          string    `json:"name"`
-	Configuration string    `json:"configuration"` // Benthos YAML or JSON
+	Name          string    `json:"name" validate:"required"`
+	Configuration string    `json:"configuration" validate:"required"` // Benthos YAML or JSON
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 }

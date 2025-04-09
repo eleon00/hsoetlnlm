@@ -7,6 +7,9 @@ import (
 
 	"github.com/eleon00/hsoetlnlm/internal/data"
 	"github.com/eleon00/hsoetlnlm/internal/service"
+
+	// Import the new benthos package
+	. "github.com/eleon00/hsoetlnlm/internal/benthos" // Using dot import for brevity, or remove dot and prefix calls with benthos.
 )
 
 // ActivitiesImpl implements the Activities interface
@@ -46,6 +49,62 @@ func (a *ActivitiesImpl) CreateReplicationRun(ctx context.Context, taskID int64)
 	run.ID = newID // Update run object with the returned ID
 
 	return run, nil
+}
+
+// ExecuteBenthosPipelineActivity generates config and runs the Benthos pipeline
+func (a *ActivitiesImpl) ExecuteBenthosPipelineActivity(ctx context.Context, taskID int64, runID int64) (string, error) {
+	// 1. Fetch the task details
+	task, err := a.svc.GetReplicationTask(ctx, taskID)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch task %d for benthos execution: %w", taskID, err)
+	}
+	if task == nil {
+		return "", fmt.Errorf("task %d not found for benthos execution", taskID)
+	}
+
+	// 2. Fetch source connection details
+	sourceConn, err := a.svc.GetConnection(ctx, task.SourceConnectionID)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch source connection %d for task %d: %w", task.SourceConnectionID, taskID, err)
+	}
+	if sourceConn == nil {
+		return "", fmt.Errorf("source connection %d not found for task %d", task.SourceConnectionID, taskID)
+	}
+
+	// 3. Fetch target connection details
+	targetConn, err := a.svc.GetConnection(ctx, task.TargetConnectionID)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch target connection %d for task %d: %w", task.TargetConnectionID, taskID, err)
+	}
+	if targetConn == nil {
+		return "", fmt.Errorf("target connection %d not found for task %d", task.TargetConnectionID, taskID)
+	}
+
+	// 4. Generate the Benthos configuration
+	// We need to import the benthos package (assuming it's created as internal/benthos)
+	configYAML, err := GenerateBenthosConfig(*task, *sourceConn, *targetConn)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate benthos config for task %d: %w", taskID, err)
+	}
+
+	// 5. Execute the Benthos pipeline
+	// Update run status to 'running' before execution
+	err = a.svc.UpdateReplicationRunStatus(ctx, runID, string(ReplicationWorkflowStateRunning), "", nil)
+	if err != nil {
+		// Log non-fatal error
+		fmt.Printf("Warning: failed to update run %d status to running: %v\n", runID, err)
+	}
+
+	// Execute Benthos (from internal/benthos)
+	// Use a timeout from the activity context
+	executionOutput, err := ExecuteBenthosPipeline(ctx, configYAML)
+	if err != nil {
+		// Benthos execution failed
+		return executionOutput, fmt.Errorf("benthos execution failed for task %d: %w", taskID, err)
+	}
+
+	// Benthos execution succeeded (according to os/exec)
+	return executionOutput, nil
 }
 
 // GenerateBenthosConfig generates a Benthos configuration for the task

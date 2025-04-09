@@ -3,9 +3,12 @@ package api
 import (
 	"net/http"
 	"strings"
+	// Keep validator import if needed elsewhere, or remove if only used in handlers
+	// "github.com/go-playground/validator/v10"
 )
 
 // NewRouter creates and configures a new HTTP router using the provided APIHandler.
+// The handler *APIHandler parameter now correctly refers to the struct defined in handlers.go
 func NewRouter(handler *APIHandler) *http.ServeMux {
 	router := http.NewServeMux()
 

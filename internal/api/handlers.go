@@ -12,16 +12,21 @@ import (
 
 	"github.com/eleon00/hsoetlnlm/internal/data"
 	"github.com/eleon00/hsoetlnlm/internal/service"
+	"github.com/go-playground/validator/v10" // Import validator
 )
 
 // APIHandler holds dependencies for API handlers, like the service layer.
 type APIHandler struct {
-	svc service.Service
+	svc       service.Service
+	validator *validator.Validate // Add validator field
 }
 
 // NewAPIHandler creates a new APIHandler with the necessary dependencies.
 func NewAPIHandler(svc service.Service) *APIHandler {
-	return &APIHandler{svc: svc}
+	return &APIHandler{
+		svc:       svc,
+		validator: validator.New(), // Initialize validator
+	}
 }
 
 // --- Helper Functions ---
@@ -93,7 +98,24 @@ func (h *APIHandler) CreateConnectionHandler(w http.ResponseWriter, r *http.Requ
 	}
 	defer r.Body.Close()
 
-	// TODO: Add input validation
+	// --- Input Validation ---
+	err = h.validator.Struct(input)
+	if err != nil {
+		// Handle validation errors
+		var validationErrors validator.ValidationErrors
+		if errors.As(err, &validationErrors) {
+			// Construct a user-friendly error message
+			// For simplicity, just log the errors and return a generic bad request
+			log.Printf("Validation errors for create connection: %v", validationErrors)
+			respondWithError(w, http.StatusBadRequest, "Invalid input: validation failed")
+		} else {
+			// Some other error during validation?
+			log.Printf("Unexpected error during validation: %v", err)
+			respondWithError(w, http.StatusInternalServerError, "Validation error")
+		}
+		return
+	}
+	// --- End Input Validation ---
 
 	newID, err := h.svc.CreateConnection(r.Context(), &input)
 	if err != nil {
@@ -166,10 +188,22 @@ func (h *APIHandler) UpdateConnectionHandler(w http.ResponseWriter, r *http.Requ
 	}
 	defer r.Body.Close()
 
-	// Assign the ID from the URL to the input struct
 	input.ID = id
 
-	// TODO: Add input validation
+	// --- Input Validation ---
+	err = h.validator.Struct(input)
+	if err != nil {
+		var validationErrors validator.ValidationErrors
+		if errors.As(err, &validationErrors) {
+			log.Printf("Validation errors for update connection %d: %v", id, validationErrors)
+			respondWithError(w, http.StatusBadRequest, "Invalid input: validation failed")
+		} else {
+			log.Printf("Unexpected error during validation for update connection %d: %v", id, err)
+			respondWithError(w, http.StatusInternalServerError, "Validation error")
+		}
+		return
+	}
+	// --- End Input Validation ---
 
 	err = h.svc.UpdateConnection(r.Context(), &input)
 	if err != nil {
@@ -254,7 +288,20 @@ func (h *APIHandler) CreateReplicationTaskHandler(w http.ResponseWriter, r *http
 	}
 	defer r.Body.Close()
 
-	// TODO: Add input validation (e.g., check connection IDs exist)
+	// --- Input Validation ---
+	err = h.validator.Struct(input)
+	if err != nil {
+		var validationErrors validator.ValidationErrors
+		if errors.As(err, &validationErrors) {
+			log.Printf("Validation errors for create replication task: %v", validationErrors)
+			respondWithError(w, http.StatusBadRequest, "Invalid input: validation failed")
+		} else {
+			log.Printf("Unexpected error during validation: %v", err)
+			respondWithError(w, http.StatusInternalServerError, "Validation error")
+		}
+		return
+	}
+	// --- End Input Validation ---
 
 	newID, err := h.svc.CreateReplicationTask(r.Context(), &input)
 	if err != nil {
@@ -325,7 +372,20 @@ func (h *APIHandler) UpdateReplicationTaskHandler(w http.ResponseWriter, r *http
 
 	input.ID = id // Set ID from URL
 
-	// TODO: Add input validation
+	// --- Input Validation ---
+	err = h.validator.Struct(input)
+	if err != nil {
+		var validationErrors validator.ValidationErrors
+		if errors.As(err, &validationErrors) {
+			log.Printf("Validation errors for update replication task %d: %v", id, validationErrors)
+			respondWithError(w, http.StatusBadRequest, "Invalid input: validation failed")
+		} else {
+			log.Printf("Unexpected error during validation for update replication task %d: %v", id, err)
+			respondWithError(w, http.StatusInternalServerError, "Validation error")
+		}
+		return
+	}
+	// --- End Input Validation ---
 
 	err = h.svc.UpdateReplicationTask(r.Context(), &input)
 	if err != nil {
@@ -408,7 +468,20 @@ func (h *APIHandler) CreateBenthosConfigHandler(w http.ResponseWriter, r *http.R
 	}
 	defer r.Body.Close()
 
-	// TODO: Add input validation (e.g., validate benthos config syntax?)
+	// --- Input Validation ---
+	err = h.validator.Struct(input)
+	if err != nil {
+		var validationErrors validator.ValidationErrors
+		if errors.As(err, &validationErrors) {
+			log.Printf("Validation errors for create benthos config: %v", validationErrors)
+			respondWithError(w, http.StatusBadRequest, "Invalid input: validation failed")
+		} else {
+			log.Printf("Unexpected error during validation: %v", err)
+			respondWithError(w, http.StatusInternalServerError, "Validation error")
+		}
+		return
+	}
+	// --- End Input Validation ---
 
 	newID, err := h.svc.CreateBenthosConfig(r.Context(), &input)
 	if err != nil {
@@ -477,7 +550,20 @@ func (h *APIHandler) UpdateBenthosConfigHandler(w http.ResponseWriter, r *http.R
 
 	input.ID = id // Set ID from URL
 
-	// TODO: Add input validation
+	// --- Input Validation ---
+	err = h.validator.Struct(input)
+	if err != nil {
+		var validationErrors validator.ValidationErrors
+		if errors.As(err, &validationErrors) {
+			log.Printf("Validation errors for update benthos config %d: %v", id, validationErrors)
+			respondWithError(w, http.StatusBadRequest, "Invalid input: validation failed")
+		} else {
+			log.Printf("Unexpected error during validation for update benthos config %d: %v", id, err)
+			respondWithError(w, http.StatusInternalServerError, "Validation error")
+		}
+		return
+	}
+	// --- End Input Validation ---
 
 	err = h.svc.UpdateBenthosConfig(r.Context(), &input)
 	if err != nil {
