@@ -77,4 +77,27 @@
     - Add input validation to API handlers (Connections, ReplicationTasks, BenthosConfigs).
     - Create SQL setup script for database tables (`Connections`, `ReplicationTasks`, `BenthosConfigurations`).
     - Configure logging and error handling more robustly.
-    - Begin Temporal integration (Workflow/Activity definitions). 
+    - Begin Temporal integration (Workflow/Activity definitions).
+
+## 2025-04-09 (Continued)
+
+- **Goal:** Implement Temporal integration for workflow orchestration.
+- **Actions:**
+    - Added Temporal Go SDK dependencies.
+    - Created interface definition for Temporal workflow client in `service` package.
+    - Created client wrapper in `internal/temporal/client.go` to interact with Temporal server.
+    - Defined workflow and activity interfaces in `internal/temporal/workflow.go`.
+    - Implemented replication workflow in `internal/temporal/replication_workflow.go`.
+    - Implemented activity handlers in `internal/temporal/activities.go`.
+    - Created worker implementation in `internal/temporal/worker.go` to register workflows and activities.
+    - Added service methods in `internal/service/replication_execution.go` to start/stop replication tasks.
+    - Updated `main.go` to initialize and integrate Temporal client and worker with proper lifecycle management.
+- **Status:** Basic Temporal integration complete, with structures to define, register, and execute workflows.
+- **Next Steps:**
+    - Implement SQL database logic for `ReplicationTasks` CRUD (necessary for proper workflow execution).
+    - Implement SQL database logic for `BenthosConfigurations` CRUD.
+    - Implement SQL database logic for `ReplicationRuns` CRUD (status tracking).
+    - Expand Benthos integration with ability to generate and execute pipelines.
+    - Add input validation to API handlers (Connections, ReplicationTasks, BenthosConfigs).
+    - Create SQL setup script for database tables (`Connections`, `ReplicationTasks`, `BenthosConfigurations`).
+    - Configure logging and error handling more robustly. 

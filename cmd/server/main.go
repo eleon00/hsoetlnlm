@@ -1,12 +1,18 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/eleon00/hsoetlnlm/internal/api"
 	"github.com/eleon00/hsoetlnlm/internal/data"
 	"github.com/eleon00/hsoetlnlm/internal/service"
+	"github.com/eleon00/hsoetlnlm/internal/temporal"
 )
 
 func main() {
@@ -47,6 +53,46 @@ func main() {
 	appService := service.NewService(db) // db might be nil here!
 	log.Println("Service layer initialized.")
 
+	// Initialize Temporal client (optional)
+	var temporalClient *temporal.Client
+	// Uncomment to enable Temporal (requires a running Temporal server)
+	/*
+		temporalClient, err = temporal.NewClient(&temporal.ClientOptions{
+			HostPort:    "localhost:7233", // Default Temporal server address
+			Namespace:   "default",
+			ServiceName: "hsoetlnlm",
+		})
+		if err != nil {
+			log.Printf("WARNING: Failed to initialize Temporal client: %v. Continuing without Temporal...", err)
+		} else {
+			defer temporalClient.Close()
+			log.Println("Temporal client initialized.")
+
+			// Set the client as the global workflow client implementation
+			service.WorkflowClientImpl = temporalClient
+		}
+	*/
+
+	// Initialize Temporal worker (optional)
+	var temporalWorker *temporal.Worker
+	if temporalClient != nil {
+		temporalWorker, err = temporal.NewWorker(temporalClient, appService, &temporal.WorkerOptions{
+			TaskQueue: "replication-tasks",
+		})
+		if err != nil {
+			log.Printf("WARNING: Failed to initialize Temporal worker: %v", err)
+		} else {
+			// Start the worker
+			err = temporalWorker.Start()
+			if err != nil {
+				log.Printf("WARNING: Failed to start Temporal worker: %v", err)
+			} else {
+				log.Println("Temporal worker started successfully.")
+				defer temporalWorker.Stop()
+			}
+		}
+	}
+
 	// Initialize API Layer
 	apiHandler := api.NewAPIHandler(appService)
 	log.Println("API handler initialized.")
@@ -59,8 +105,37 @@ func main() {
 	port := ":8080"
 	log.Printf("Starting server on http://localhost%s\n", port)
 
-	// Start the HTTP server with the router
-	if err := http.ListenAndServe(port, router); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+	// Create HTTP server
+	server := &http.Server{
+		Addr:         port,
+		Handler:      router,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
+
+	// Start server in a goroutine so it doesn't block
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Failed to start server: %v", err)
+		}
+	}()
+	log.Println("Server started successfully.")
+
+	// Setup graceful shutdown
+	// Wait for interrupt signal to gracefully shutdown the server
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Println("Server is shutting down...")
+
+	// Create a deadline for shutdown
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	// Shutdown the server
+	if err := server.Shutdown(ctx); err != nil {
+		log.Fatalf("Server shutdown failed: %v", err)
+	}
+	log.Println("Server shutdown complete")
 }
