@@ -80,7 +80,39 @@ func NewRouter(handler *APIHandler) *http.ServeMux {
 		}
 	})
 
-	// Placeholder for other resource routes (e.g., /replication-tasks)
+	// Benthos Configs endpoints
+	router.HandleFunc("/benthos-configs", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			handler.ListBenthosConfigsHandler(w, r)
+		case http.MethodPost:
+			handler.CreateBenthosConfigHandler(w, r)
+		default:
+			w.Header().Set("Allow", "GET, POST")
+			respondWithError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
+		}
+	})
+
+	router.HandleFunc("/benthos-configs/", func(w http.ResponseWriter, r *http.Request) {
+		pathPrefix := "/benthos-configs/"
+		if !strings.HasPrefix(r.URL.Path, pathPrefix) || r.URL.Path == pathPrefix {
+			http.NotFound(w, r)
+			return
+		}
+		switch r.Method {
+		case http.MethodGet:
+			handler.GetBenthosConfigHandler(w, r)
+		case http.MethodPut:
+			handler.UpdateBenthosConfigHandler(w, r)
+		case http.MethodDelete:
+			handler.DeleteBenthosConfigHandler(w, r)
+		default:
+			w.Header().Set("Allow", "GET, PUT, DELETE")
+			respondWithError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
+		}
+	})
+
+	// Placeholder for other resource routes
 
 	return router
 }

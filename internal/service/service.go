@@ -25,6 +25,13 @@ type Service interface {
 	UpdateReplicationTask(ctx context.Context, task *data.ReplicationTask) error
 	DeleteReplicationTask(ctx context.Context, id int64) error
 
+	// BenthosConfiguration methods
+	CreateBenthosConfig(ctx context.Context, config *data.BenthosConfiguration) (int64, error)
+	GetBenthosConfig(ctx context.Context, id int64) (*data.BenthosConfiguration, error)
+	ListBenthosConfigs(ctx context.Context) ([]*data.BenthosConfiguration, error)
+	UpdateBenthosConfig(ctx context.Context, config *data.BenthosConfiguration) error
+	DeleteBenthosConfig(ctx context.Context, id int64) error
+
 	// ... other business logic methods
 }
 

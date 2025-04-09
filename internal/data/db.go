@@ -28,6 +28,13 @@ type Repository interface {
 	UpdateReplicationTask(ctx context.Context, task *ReplicationTask) error
 	DeleteReplicationTask(ctx context.Context, id int64) error
 
+	// BenthosConfiguration methods (Placeholders)
+	CreateBenthosConfig(ctx context.Context, config *BenthosConfiguration) (int64, error)
+	GetBenthosConfig(ctx context.Context, id int64) (*BenthosConfiguration, error)
+	ListBenthosConfigs(ctx context.Context) ([]*BenthosConfiguration, error)
+	UpdateBenthosConfig(ctx context.Context, config *BenthosConfiguration) error
+	DeleteBenthosConfig(ctx context.Context, id int64) error
+
 	// Placeholder methods for other resources
 	// GetReplicationRun(ctx context.Context, id int64) (*ReplicationRun, error)
 	// ... other CRUD operations for ReplicationTask, ReplicationRun, etc.

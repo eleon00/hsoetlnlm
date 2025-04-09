@@ -369,3 +369,154 @@ func (h *APIHandler) DeleteReplicationTaskHandler(w http.ResponseWriter, r *http
 
 	respondWithJSON(w, http.StatusNoContent, nil)
 }
+
+// --- Benthos Config Handlers ---
+
+// ListBenthosConfigsHandler handles GET requests to /benthos-configs.
+func (h *APIHandler) ListBenthosConfigsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", http.MethodGet)
+		respondWithError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
+		return
+	}
+
+	configs, err := h.svc.ListBenthosConfigs(r.Context())
+	if err != nil {
+		log.Printf("Error listing benthos configs: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to retrieve benthos configs")
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, configs)
+}
+
+// CreateBenthosConfigHandler handles POST requests to /benthos-configs.
+func (h *APIHandler) CreateBenthosConfigHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", http.MethodPost)
+		respondWithError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
+		return
+	}
+
+	var input data.BenthosConfiguration
+	err := json.NewDecoder(r.Body).Decode(&input)
+	if err != nil {
+		log.Printf("Error decoding create benthos config request: %v", err)
+		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+	defer r.Body.Close()
+
+	// TODO: Add input validation (e.g., validate benthos config syntax?)
+
+	newID, err := h.svc.CreateBenthosConfig(r.Context(), &input)
+	if err != nil {
+		log.Printf("Error creating benthos config: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to create benthos config")
+		return
+	}
+
+	w.Header().Set("Location", fmt.Sprintf("/benthos-configs/%d", newID))
+	input.ID = newID
+	respondWithJSON(w, http.StatusCreated, input)
+}
+
+// GetBenthosConfigHandler handles GET requests to /benthos-configs/{id}.
+func (h *APIHandler) GetBenthosConfigHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", http.MethodGet)
+		respondWithError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
+		return
+	}
+
+	idStr := r.URL.Path[len("/benthos-configs/"):] // Naive routing
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid benthos config ID")
+		return
+	}
+
+	config, err := h.svc.GetBenthosConfig(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			respondWithError(w, http.StatusNotFound, "Benthos config not found")
+		} else {
+			log.Printf("Error getting benthos config %d: %v", id, err)
+			respondWithError(w, http.StatusInternalServerError, "Failed to retrieve benthos config")
+		}
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, config)
+}
+
+// UpdateBenthosConfigHandler handles PUT requests to /benthos-configs/{id}.
+func (h *APIHandler) UpdateBenthosConfigHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		w.Header().Set("Allow", http.MethodPut)
+		respondWithError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
+		return
+	}
+
+	idStr := r.URL.Path[len("/benthos-configs/"):] // Naive routing
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid benthos config ID")
+		return
+	}
+
+	var input data.BenthosConfiguration
+	err = json.NewDecoder(r.Body).Decode(&input)
+	if err != nil {
+		log.Printf("Error decoding update benthos config request: %v", err)
+		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+	defer r.Body.Close()
+
+	input.ID = id // Set ID from URL
+
+	// TODO: Add input validation
+
+	err = h.svc.UpdateBenthosConfig(r.Context(), &input)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			respondWithError(w, http.StatusNotFound, "Benthos config not found")
+		} else {
+			log.Printf("Error updating benthos config %d: %v", id, err)
+			respondWithError(w, http.StatusInternalServerError, "Failed to update benthos config")
+		}
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, input)
+}
+
+// DeleteBenthosConfigHandler handles DELETE requests to /benthos-configs/{id}.
+func (h *APIHandler) DeleteBenthosConfigHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		w.Header().Set("Allow", http.MethodDelete)
+		respondWithError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
+		return
+	}
+
+	idStr := r.URL.Path[len("/benthos-configs/"):] // Naive routing
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid benthos config ID")
+		return
+	}
+
+	err = h.svc.DeleteBenthosConfig(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			respondWithError(w, http.StatusNotFound, "Benthos config not found")
+		} else {
+			log.Printf("Error deleting benthos config %d: %v", id, err)
+			respondWithError(w, http.StatusInternalServerError, "Failed to delete benthos config")
+		}
+		return
+	}
+
+	respondWithJSON(w, http.StatusNoContent, nil)
+}
